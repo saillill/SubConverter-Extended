@@ -26,6 +26,65 @@
 
 WebServer webServer;
 
+static const char *VERSION_FAVICON_DARK = R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SubConverter-Extended icon">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="18" y1="20" x2="46" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="green" x1="46" y1="44" x2="18" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#84cc16"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <path d="M18 20h25" fill="none" stroke="url(#cyan)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M40 11l10 9-10 9" fill="none" stroke="#67e8f9" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 44H21" fill="none" stroke="url(#green)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M24 35l-10 9 10 9" fill="none" stroke="#bef264" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 31c0-6 4-10 9-10 3 0 6 1 8 3" fill="none" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
+  <path d="M40 33c0 6-4 10-9 10-3 0-6-1-8-3" fill="none" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
+</svg>)";
+
+static const char *VERSION_FAVICON_LIGHT = R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SubConverter-Extended icon">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e8eef7"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="18" y1="20" x2="46" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0284c7"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="green" x1="46" y1="44" x2="18" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#059669"/>
+      <stop offset="1" stop-color="#65a30d"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="12.5" fill="none" stroke="#cbd5e1" stroke-width="3"/>
+  <path d="M18 20h25" fill="none" stroke="url(#cyan)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M40 11l10 9-10 9" fill="none" stroke="#06b6d4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 44H21" fill="none" stroke="url(#green)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M24 35l-10 9 10 9" fill="none" stroke="#84cc16" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 31c0-6 4-10 9-10 3 0 6 1 8 3" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/>
+  <path d="M40 33c0 6-4 10-9 10-3 0-6-1-8-3" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/>
+</svg>)";
+
+std::string versionFaviconDark(Request &, Response &response) {
+  response.headers["Cache-Control"] = "public, max-age=86400";
+  return VERSION_FAVICON_DARK;
+}
+
+std::string versionFaviconLight(Request &, Response &response) {
+  response.headers["Cache-Control"] = "public, max-age=86400";
+  return VERSION_FAVICON_LIGHT;
+}
+
 #ifndef _WIN32
 void SetConsoleTitle(const std::string &title) {
   system(std::string("echo \"\\033]0;" + title + R"(\007\c")").data());
@@ -183,6 +242,13 @@ int main(int argc, char *argv[]) {
   });
   */
 
+  webServer.append_response("GET", "/version/favicon-dark.svg",
+                            "image/svg+xml; charset=utf-8",
+                            versionFaviconDark);
+  webServer.append_response("GET", "/version/favicon-light.svg",
+                            "image/svg+xml; charset=utf-8",
+                            versionFaviconLight);
+
   webServer.append_response(
       "GET", "/version", "text/html; charset=utf-8",
       [](RESPONSE_CALLBACK_ARGS) -> std::string {
@@ -230,6 +296,9 @@ int main(int argc, char *argv[]) {
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <meta name="color-scheme" content="light dark">
     <title>SubConverter-Extended</title>
+    <link rel="icon" type="image/svg+xml" href="/version/favicon-dark.svg">
+    <link rel="icon" type="image/svg+xml" href="/version/favicon-light.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="/version/favicon-dark.svg" media="(prefers-color-scheme: dark)">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">

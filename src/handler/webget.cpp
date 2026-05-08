@@ -1,4 +1,6 @@
+#include <future>
 #include <iostream>
+#include <map>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <mutex>
@@ -37,6 +39,16 @@ struct curl_progress_data
 {
     long size_limit = 0L;
 };
+
+struct CacheFetchResult
+{
+    int status_code = 0;
+    std::string content;
+    std::string response_headers;
+};
+
+static std::mutex cache_fetch_mutex;
+static std::map<std::string, std::shared_future<CacheFetchResult>> cache_fetches;
 
 static CURLcode curl_init()
 {
@@ -150,7 +162,7 @@ static int logger(CURL *handle, curl_infotype type, char *data, size_t size, voi
 static inline void curl_set_common_options(CURL *curl_handle, const char *url, curl_progress_data *data)
 {
     curl_easy_setopt(curl_handle, CURLOPT_URL, url);
-    curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, global.logLevel == LOG_LEVEL_VERBOSE ? 1L : 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, shouldLog(LOG_LEVEL_VERBOSE) ? 1L : 0L);
     curl_easy_setopt(curl_handle, CURLOPT_DEBUGFUNCTION, logger);
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl_handle, CURLOPT_NOSIGNAL, 1L);
@@ -358,7 +370,8 @@ std::string webGet(const std::string &url, const std::string &proxy, unsigned in
             time_t mtime = result.st_mtime, now = time(nullptr); // get cache modified time and current time
             if(difftime(now, mtime) <= cache_ttl) // within TTL
             {
-                writeLog(0, "CACHE HIT: '" + url + "', using local cache.");
+                if(shouldLog(LOG_LEVEL_VERBOSE))
+                    writeLog(0, "CACHE HIT: '" + url + "', using local cache.");
                 //guarded_mutex guard(cache_rw_lock);
                 cache_rw_lock.readLock();
                 defer(cache_rw_lock.readUnlock();)
@@ -366,26 +379,58 @@ std::string webGet(const std::string &url, const std::string &proxy, unsigned in
                     *response_headers = fileGet(path_header, true);
                 return fileGet(path, true);
             }
-            writeLog(0, "CACHE MISS: '" + url + "', TTL timeout, creating new cache."); // out of TTL
+            if(shouldLog(LOG_LEVEL_VERBOSE))
+                writeLog(0, "CACHE MISS: '" + url + "', TTL timeout, creating new cache."); // out of TTL
         }
         else
-            writeLog(0, "CACHE NOT EXIST: '" + url + "', creating new cache.");
-        //content = curlGet(url, proxy, response_headers, return_code); // try to fetch data
-        curlGet(argument, fetch_res);
+        {
+            if(shouldLog(LOG_LEVEL_VERBOSE))
+                writeLog(0, "CACHE NOT EXIST: '" + url + "', creating new cache.");
+        }
+        std::shared_future<CacheFetchResult> fetch_future;
+        bool owner = false;
+        {
+            std::lock_guard<std::mutex> lock(cache_fetch_mutex);
+            auto iter = cache_fetches.find(url_md5);
+            if(iter == cache_fetches.end())
+            {
+                fetch_future = std::async(std::launch::async, [argument]() {
+                    CacheFetchResult result;
+                    FetchResult fetch_result {&result.status_code, &result.content,
+                                               &result.response_headers, nullptr};
+                    curlGet(argument, fetch_result);
+                    return result;
+                }).share();
+                cache_fetches.emplace(url_md5, fetch_future);
+                owner = true;
+            }
+            else
+                fetch_future = iter->second;
+        }
+
+        CacheFetchResult fetched = fetch_future.get();
+        return_code = fetched.status_code;
+        content = std::move(fetched.content);
+        if(response_headers)
+            *response_headers = fetched.response_headers;
         if(return_code == 200) // success, save new cache
         {
-            //guarded_mutex guard(cache_rw_lock);
-            cache_rw_lock.writeLock();
-            defer(cache_rw_lock.writeUnlock();)
-            fileWrite(path, content, true);
-            if(response_headers)
-                fileWrite(path_header, *response_headers, true);
+            if(owner)
+            {
+                //guarded_mutex guard(cache_rw_lock);
+                cache_rw_lock.writeLock();
+                defer(cache_rw_lock.writeUnlock();)
+                fileWrite(path, content, true);
+                if(!fetched.response_headers.empty())
+                    fileWrite(path_header, fetched.response_headers, true);
+            }
         }
         else
         {
             if(fileExist(path) && global.serveCacheOnFetchFail) // failed, check if cache exist
             {
-                writeLog(0, "Fetch failed. Serving cached content."); // cache exist, serving cache
+                if(shouldLog(LOG_LEVEL_VERBOSE))
+                    writeLog(0, "Fetch failed. Serving cached content."); // cache exist, serving cache
                 //guarded_mutex guard(cache_rw_lock);
                 cache_rw_lock.readLock();
                 defer(cache_rw_lock.readUnlock();)
@@ -394,7 +439,15 @@ std::string webGet(const std::string &url, const std::string &proxy, unsigned in
                     *response_headers = fileGet(path_header, true);
             }
             else
-                writeLog(0, "Fetch failed. No local cache available."); // cache not exist or not allow to serve cache, serving nothing
+            {
+                if(shouldLog(LOG_LEVEL_VERBOSE))
+                    writeLog(0, "Fetch failed. No local cache available."); // cache not exist or not allow to serve cache, serving nothing
+            }
+        }
+        if(owner)
+        {
+            std::lock_guard<std::mutex> lock(cache_fetch_mutex);
+            cache_fetches.erase(url_md5);
         }
         return content;
     }

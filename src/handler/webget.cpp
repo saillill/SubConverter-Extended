@@ -47,6 +47,14 @@ struct CacheFetchResult
     std::string response_headers;
 };
 
+struct GitHubFileRef
+{
+    std::string owner;
+    std::string repo;
+    std::string ref;
+    std::string path;
+};
+
 static std::mutex cache_fetch_mutex;
 static std::map<std::string, std::shared_future<CacheFetchResult>> cache_fetches;
 
@@ -85,6 +93,145 @@ static std::string build_cache_key(const std::string &url, const std::string &pr
         }
     }
     return getMD5(identity);
+}
+
+static std::string strip_url_query_fragment(const std::string &url)
+{
+    std::string::size_type pos = url.find_first_of("?#");
+    if(pos == std::string::npos)
+        return url;
+    return url.substr(0, pos);
+}
+
+static std::string join_path_segments(const string_array &segments, size_t start,
+                                      size_t end)
+{
+    std::string result;
+    for(size_t i = start; i < end; i++)
+    {
+        if(!result.empty())
+            result += "/";
+        result += segments[i];
+    }
+    return result;
+}
+
+static bool split_github_ref_path(const string_array &segments, size_t ref_start,
+                                  std::string &ref, std::string &path)
+{
+    if(segments.size() <= ref_start + 1)
+        return false;
+
+    size_t path_start = ref_start + 1;
+    if(segments[ref_start] == "refs" &&
+       (segments[ref_start + 1] == "heads" ||
+        segments[ref_start + 1] == "tags"))
+    {
+        if(segments.size() <= ref_start + 3)
+            return false;
+        ref = join_path_segments(segments, ref_start, ref_start + 3);
+        path_start = ref_start + 3;
+    }
+    else
+        ref = segments[ref_start];
+
+    if(path_start >= segments.size())
+        return false;
+
+    path = join_path_segments(segments, path_start, segments.size());
+    return !ref.empty() && !path.empty();
+}
+
+static bool parse_raw_githubusercontent_url(const std::string &url,
+                                            GitHubFileRef &file_ref)
+{
+    const std::string https_prefix = "https://raw.githubusercontent.com/";
+    const std::string http_prefix = "http://raw.githubusercontent.com/";
+    std::string content_path;
+
+    if(startsWith(url, https_prefix))
+        content_path = url.substr(https_prefix.size());
+    else if(startsWith(url, http_prefix))
+        content_path = url.substr(http_prefix.size());
+    else
+        return false;
+
+    string_array segments = split(content_path, "/");
+    if(segments.size() < 4)
+        return false;
+
+    file_ref.owner = segments[0];
+    file_ref.repo = segments[1];
+    return split_github_ref_path(segments, 2, file_ref.ref, file_ref.path);
+}
+
+static bool parse_github_file_url(const std::string &url, GitHubFileRef &file_ref)
+{
+    const std::string https_prefix = "https://github.com/";
+    const std::string http_prefix = "http://github.com/";
+    std::string content_path;
+
+    if(startsWith(url, https_prefix))
+        content_path = url.substr(https_prefix.size());
+    else if(startsWith(url, http_prefix))
+        content_path = url.substr(http_prefix.size());
+    else
+        return false;
+
+    string_array segments = split(content_path, "/");
+    if(segments.size() < 5)
+        return false;
+    if(segments[2] != "raw" && segments[2] != "blob")
+        return false;
+
+    file_ref.owner = segments[0];
+    file_ref.repo = segments[1];
+    return split_github_ref_path(segments, 3, file_ref.ref, file_ref.path);
+}
+
+static bool build_jsdelivr_github_url(const std::string &url,
+                                      std::string &fallback_url)
+{
+    GitHubFileRef file_ref;
+    std::string clean_url = strip_url_query_fragment(url);
+    if(!parse_raw_githubusercontent_url(clean_url, file_ref) &&
+       !parse_github_file_url(clean_url, file_ref))
+        return false;
+
+    fallback_url = "https://cdn.jsdelivr.net/gh/" + file_ref.owner + "/" +
+                   file_ref.repo + "@" + file_ref.ref + "/" + file_ref.path;
+    return true;
+}
+
+static bool should_try_jsdelivr_fallback(CURLcode ret_code, int status_code)
+{
+    if(ret_code != CURLE_OK)
+    {
+        switch(ret_code)
+        {
+        case CURLE_UNSUPPORTED_PROTOCOL:
+        case CURLE_URL_MALFORMAT:
+        case CURLE_FAILED_INIT:
+        case CURLE_OUT_OF_MEMORY:
+        case CURLE_ABORTED_BY_CALLBACK:
+        case CURLE_FILESIZE_EXCEEDED:
+            return false;
+        default:
+            return true;
+        }
+    }
+
+    return status_code == 0 || status_code == 429 || status_code >= 500;
+}
+
+static void clear_fetch_output(FetchResult &result)
+{
+    if(result.content)
+        result.content->clear();
+    if(result.response_headers)
+        result.response_headers->clear();
+    if(result.cookies)
+        result.cookies->clear();
 }
 
 static int writer(char *data, size_t size, size_t nmemb, std::string *writerData)
@@ -182,7 +329,7 @@ static inline void curl_set_common_options(CURL *curl_handle, const char *url, c
 }
 
 //static std::string curlGet(const std::string &url, const std::string &proxy, std::string &response_headers, CURLcode &return_code, const string_map &request_headers)
-static int curlGet(const FetchArgument &argument, FetchResult &result)
+static int curlGet(const FetchArgument &argument, FetchResult &result, CURLcode *return_code = nullptr)
 {
     CURL *curl_handle;
     std::string *data = result.content, new_url = argument.url;
@@ -194,6 +341,8 @@ static int curlGet(const FetchArgument &argument, FetchResult &result)
     if(retVal != CURLE_OK)
     {
         *result.status_code = 0;
+        if(return_code)
+            *return_code = retVal;
         writeLog(0, "curl_global_init failed: " + std::string(curl_easy_strerror(retVal)), LOG_LEVEL_ERROR);
         return 0;
     }
@@ -201,7 +350,10 @@ static int curlGet(const FetchArgument &argument, FetchResult &result)
     curl_handle = curl_easy_init();
     if(curl_handle == nullptr)
     {
+        retVal = CURLE_FAILED_INIT;
         *result.status_code = 0;
+        if(return_code)
+            *return_code = retVal;
         writeLog(0, "curl_easy_init failed.", LOG_LEVEL_ERROR);
         return 0;
     }
@@ -294,6 +446,8 @@ static int curlGet(const FetchArgument &argument, FetchResult &result)
     long code = 0;
     curl_easy_getinfo(curl_handle, CURLINFO_HTTP_CODE, &code);
     *result.status_code = code;
+    if(return_code)
+        *return_code = retVal;
 
     if(result.cookies)
     {
@@ -322,6 +476,57 @@ static int curlGet(const FetchArgument &argument, FetchResult &result)
     }
 
     return *result.status_code;
+}
+
+static int curlGetWithGitHubFallback(const FetchArgument &argument, FetchResult &result)
+{
+    CURLcode original_code = CURLE_OK;
+    int original_status = curlGet(argument, result, &original_code);
+
+    std::string fallback_url;
+    if(argument.method != HTTP_GET || argument.keep_resp_on_fail ||
+       original_status == 200 ||
+       !should_try_jsdelivr_fallback(original_code, original_status) ||
+       !build_jsdelivr_github_url(argument.url, fallback_url))
+        return original_status;
+
+    std::string original_headers, original_cookies;
+    if(result.response_headers)
+        original_headers = *result.response_headers;
+    if(result.cookies)
+        original_cookies = *result.cookies;
+
+    writeLog(0,
+             "GitHub raw fetch failed, trying jsDelivr fallback: " +
+                 fallback_url,
+             LOG_LEVEL_WARNING);
+    clear_fetch_output(result);
+
+    FetchArgument fallback_argument {HTTP_GET, fallback_url, argument.proxy,
+                                     nullptr, argument.request_headers,
+                                     argument.cookies, argument.cache_ttl,
+                                     argument.keep_resp_on_fail};
+    CURLcode fallback_code = CURLE_OK;
+    int fallback_status = curlGet(fallback_argument, result, &fallback_code);
+    if(fallback_code == CURLE_OK && fallback_status == 200)
+    {
+        writeLog(0,
+                 "GitHub raw fallback succeeded via jsDelivr: " +
+                     fallback_url,
+                 LOG_LEVEL_INFO);
+        return fallback_status;
+    }
+
+    writeLog(0,
+             "GitHub raw fallback failed via jsDelivr: " + fallback_url,
+             LOG_LEVEL_WARNING);
+    clear_fetch_output(result);
+    if(result.response_headers)
+        *result.response_headers = original_headers;
+    if(result.cookies)
+        *result.cookies = original_cookies;
+    *result.status_code = original_status;
+    return original_status;
 }
 
 // data:[<mediatype>][;base64],<data>
@@ -398,7 +603,7 @@ std::string webGet(const std::string &url, const std::string &proxy, unsigned in
                     CacheFetchResult result;
                     FetchResult fetch_result {&result.status_code, &result.content,
                                                &result.response_headers, nullptr};
-                    curlGet(argument, fetch_result);
+                    curlGetWithGitHubFallback(argument, fetch_result);
                     return result;
                 }).share();
                 cache_fetches.emplace(url_md5, fetch_future);
@@ -452,7 +657,7 @@ std::string webGet(const std::string &url, const std::string &proxy, unsigned in
         return content;
     }
     //return curlGet(url, proxy, response_headers, return_code);
-    curlGet(argument, fetch_res);
+    curlGetWithGitHubFallback(argument, fetch_res);
     return content;
 }
 
@@ -501,5 +706,5 @@ string_array headers_map_to_array(const string_map &headers)
 
 int webGet(const FetchArgument& argument, FetchResult &result)
 {
-    return curlGet(argument, result);
+    return curlGetWithGitHubFallback(argument, result);
 }

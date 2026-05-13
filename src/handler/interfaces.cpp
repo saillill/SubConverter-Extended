@@ -189,7 +189,12 @@ std::string getRuleset(RESPONSE_CALLBACK_ARGS) {
 
   if (output_content.empty()) {
     *status_code = 400;
-    return "Invalid request!";
+    return "Invalid request: no valid rules were found in the supplied "
+           "ruleset source.\n"
+           "无效请求：提供的规则集来源中未找到有效规则。\n"
+           "Please check whether the URL is reachable and the ruleset type "
+           "matches the content.\n"
+           "请检查链接是否可访问，以及规则集类型是否与内容匹配。";
   }
 
   std::string strLine;

@@ -44,6 +44,69 @@ static inline void parse_json_pointer(nlohmann::json &json, const std::string &p
     }
 }
 
+static bool path_is_inside_scope(const std::filesystem::path &path,
+                                 const std::filesystem::path &scope)
+{
+    try
+    {
+        std::filesystem::path relative = std::filesystem::relative(path, scope);
+        std::string rel = relative.generic_string();
+        return rel == "." ||
+               (!relative.is_absolute() && rel != ".." &&
+                !startsWith(rel, "../"));
+    }
+    catch(std::exception &)
+    {
+        return false;
+    }
+}
+
+static std::string python_string_escape(const std::string &value)
+{
+    static const char hex[] = "0123456789abcdef";
+    std::string escaped;
+    escaped.reserve(value.size());
+    for(unsigned char c : value)
+    {
+        switch(c)
+        {
+        case '\\':
+            escaped += "\\\\";
+            break;
+        case '"':
+            escaped += "\\\"";
+            break;
+        case '\'':
+            escaped += "\\'";
+            break;
+        case '\n':
+            escaped += "\\n";
+            break;
+        case '\r':
+            escaped += "\\r";
+            break;
+        case '\t':
+            escaped += "\\t";
+            break;
+        default:
+            if(c < 0x20)
+            {
+                escaped += "\\x";
+                escaped += hex[c >> 4];
+                escaped += hex[c & 0x0f];
+            }
+            else
+                escaped += static_cast<char>(c);
+        }
+    }
+    return escaped;
+}
+
+static std::string python_string_literal(const std::string &value)
+{
+    return "\"" + python_string_escape(value) + "\"";
+}
+
 /*
 std::string parseHostname(inja::Arguments &args)
 {
@@ -260,7 +323,8 @@ int render_template(const std::string &content, const template_args &vars,
         {
             throw inja::FileError(e.what());
         }
-        if(!absolute_scope.empty() && !startsWith(absolute_path, absolute_scope))
+        if(!absolute_scope.empty() &&
+           !path_is_inside_scope(absolute_path, absolute_scope))
             throw inja::FileError("access denied when trying to include '" + template_name + "': out of scope");
         return env.parse(fileGet(template_name, true));
     });
@@ -364,7 +428,8 @@ int renderClashScript(YAML::Node &base_rule, std::vector<RulesetContent> &rulese
                     vArray = split(strLine, ",");
                     if(vArray.size() < 2)
                         continue;
-                    geoips += "\"" + vArray[1] + "\": \"" + rule_group + "\",";
+                    geoips += python_string_literal(vArray[1]) + ": " +
+                              python_string_literal(rule_group) + ",";
                 }
                 continue;
             }
@@ -486,9 +551,11 @@ int renderClashScript(YAML::Node &base_rule, std::vector<RulesetContent> &rulese
                         if(vArray.size() < 2)
                             continue;
                         if(keywords.find(rule_name) == keywords.end())
-                            keywords[rule_name] = "\"" + trim(vArray[1]) + "\"";
+                            keywords[rule_name] =
+                                python_string_literal(trim(vArray[1]));
                         else
-                            keywords[rule_name] += ",\"" + trim(vArray[1]) + "\"";
+                            keywords[rule_name] += "," +
+                                                   python_string_literal(trim(vArray[1]));
                     }
                     else
                     {
@@ -588,8 +655,8 @@ int renderClashScript(YAML::Node &base_rule, std::vector<RulesetContent> &rulese
             std::string json_path = "rules." + std::to_string(index) + ".";
             parse_json_pointer(data, json_path + "has_domain", group_has_domain ? "true" : "false");
             parse_json_pointer(data, json_path + "has_ipcidr", group_has_ipcidr ? "true" : "false");
-            parse_json_pointer(data, json_path + "name", x);
-            parse_json_pointer(data, json_path + "group", name);
+            parse_json_pointer(data, json_path + "name", python_string_escape(x));
+            parse_json_pointer(data, json_path + "group", python_string_escape(name));
             parse_json_pointer(data, json_path + "set", "true");
             parse_json_pointer(data, json_path + "keyword", keyword);
             parse_json_pointer(data, json_path + "original", (rule_type[x] == RULESET_CLASH_DOMAIN || rule_type[x] == RULESET_CLASH_IPCIDR) ? "true" : "false");
@@ -601,7 +668,8 @@ int renderClashScript(YAML::Node &base_rule, std::vector<RulesetContent> &rulese
         if(!geoips.empty())
             parse_json_pointer(data, "geoips", geoips.erase(geoips.size() - 1));
 
-        parse_json_pointer(data, "match_group", match_group);
+        parse_json_pointer(data, "match_group",
+                           python_string_escape(match_group));
 
         inja::Environment env;
         env.include_template("keyword_template", env.parse(clash_script_keyword_template));

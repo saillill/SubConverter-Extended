@@ -1074,6 +1074,8 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode,
     default:
       continue;
     }
+    if (!x.Icon.empty())
+      singlegroup["icon"] = x.Icon;
     if (!x.DisableUdp.is_undef())
       singlegroup["disable-udp"] = x.DisableUdp.get();
 
@@ -1740,6 +1742,8 @@ std::string proxyToSurge(std::vector<Proxy> &nodes,
 
     group = x.TypeStr() + ",";
     group += join(filtered_nodelist, ",");
+    if (!x.Icon.empty())
+      group += ",img-url=" + x.Icon;
     if (x.Type == ProxyGroupType::URLTest ||
         x.Type == ProxyGroupType::Fallback ||
         x.Type == ProxyGroupType::LoadBalance) {
@@ -3103,8 +3107,10 @@ std::string proxyToLoon(std::vector<Proxy> &nodes, const std::string &base_conf,
       if (x.Type == ProxyGroupType::Fallback)
         group += ",max-timeout=" + std::to_string(x.Timeout);
     }
+    if (!x.Icon.empty())
+      group += ",img-url=" + x.Icon;
 
-    ini.set("{NONAME}", x.Name + " = " + group); // insert order
+    ini.set("{NONAME}", x.Name + " = " + group); // insert order (QuantumultX)
   }
 
   if (ext.enable_rule_generator)

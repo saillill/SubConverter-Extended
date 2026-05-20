@@ -31,6 +31,7 @@ struct ProxyGroupConfig
     Integer Timeout = 0;
     Integer Tolerance = 0;
     BalanceStrategy Strategy = BalanceStrategy::ConsistentHashing;
+    String Icon;
     Boolean Lazy;
     Boolean DisableUdp;
     Boolean Persistent;

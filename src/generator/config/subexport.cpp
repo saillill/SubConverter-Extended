@@ -1046,8 +1046,10 @@ void proxyToClash(std::vector<Proxy> &nodes, YAML::Node &yamlnode,
     default:
       continue;
     }
-    if (!x.Icon.empty())
+    if (!x.Icon.empty()) {
       singlegroup["icon"] = x.Icon;
+      writeLog(0, "ICON-DEBUG: set icon for '" + x.Name + "' -> " + x.Icon, LOG_LEVEL_INFO);
+    }
     if (!x.DisableUdp.is_undef())
       singlegroup["disable-udp"] = x.DisableUdp.get();
 

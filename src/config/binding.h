@@ -239,6 +239,13 @@ namespace INIBinding
                     continue;
                 }
 
+                // extract icon from last segment BEFORE url-test stripping (format: img-url=https://...)
+                if(rules_upper_bound > 0 && startsWith(vArray[rules_upper_bound - 1], "img-url="))
+                {
+                    conf.Icon = vArray[rules_upper_bound - 1].substr(8);
+                    rules_upper_bound--;
+                }
+
                 if(conf.Type == ProxyGroupType::URLTest || conf.Type == ProxyGroupType::LoadBalance || conf.Type == ProxyGroupType::Fallback)
                 {
                     if(rules_upper_bound < 5)
@@ -246,13 +253,6 @@ namespace INIBinding
                     rules_upper_bound -= 2;
                     conf.Url = vArray[rules_upper_bound];
                     parseGroupTimes(vArray[rules_upper_bound + 1], &conf.Interval, &conf.Timeout, &conf.Tolerance);
-                }
-
-                // extract icon from last segment (format: img-url=https://...)
-                if(rules_upper_bound > 0 && startsWith(vArray[rules_upper_bound - 1], "img-url="))
-                {
-                    conf.Icon = vArray[rules_upper_bound - 1].substr(8);
-                    rules_upper_bound--;
                 }
 
                 for(unsigned int i = 2; i < rules_upper_bound; i++)

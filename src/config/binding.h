@@ -84,6 +84,8 @@ namespace toml
                 throw serialization_error(format_error("Proxy Group must contains at least one of proxy match rule or provider!", v.location(), "here"), v.location());
             if(v.contains("disable-udp"))
                 conf.DisableUdp = find_or(v, "disable-udp", conf.DisableUdp.get());
+            if(v.contains("icon"))
+                conf.Icon = find<String>(v, "icon");
             return conf;
         }
     };

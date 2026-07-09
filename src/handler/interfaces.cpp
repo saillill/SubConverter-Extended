@@ -42,7 +42,8 @@ const std::vector<std::string> DEFAULT_REMOTE_CONFIG_FALLBACKS = {
     "https://cdn.jsdelivr.net/gh/saillill/Custom_OpenClash_Rules@refs/"
     "heads/main/cfg/Custom_Clash.ini",
     "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules/"
-    "main/cfg/Custom_Clash.ini"};
+    "main/cfg/Custom_Clash.ini",
+    "/base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini"};
 
 static void appendUniqueConfig(std::vector<std::string> &configs,
                                std::unordered_set<std::string> &seen,

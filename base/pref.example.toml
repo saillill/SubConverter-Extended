@@ -34,7 +34,7 @@ enable_filter = false
 #}
 #'''
 
-default_external_config = "/base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini"
+default_external_config = "https://testingcf.jsdelivr.net/gh/saillill/Custom_OpenClash_Rules@main/cfg/Custom_Clash.ini"
 
 # The file scope limit of the 'rule_base' options in external configs.
 base_path = "base"

@@ -230,10 +230,6 @@ RUN set -e && \
       'if [ ! -f "$CONF" ] && [ -f /base/pref.example.toml ]; then' \
       '  cp /base/pref.example.toml "$CONF"' \
       'fi' \
-      '# Fork: fix upstream URLs in pref.toml on every container start' \
-      'if [ -f "$CONF" ]; then' \
-      '  sed -i "s|Aethersailor|saillill|g" "$CONF" 2>/dev/null || true' \
-      'fi' \
       'exec /usr/bin/subconverter -f "$CONF"' \
       > /usr/local/bin/start-subconverter && \
     chmod +x /usr/local/bin/start-subconverter

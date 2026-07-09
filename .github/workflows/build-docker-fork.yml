@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile.debian
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/subconverter-extended:latest

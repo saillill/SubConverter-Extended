@@ -57,29 +57,32 @@ jobs:
         if: steps.merge.outputs.merge_success == 'true'
         id: patch
         run: |
-          # 1. 把硬编码的默认配置地址从 Aethersailor 改为 saillill (settings.cpp)
-          sed -i 's|https://gcore.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini|https://testingcf.jsdelivr.net/gh/saillill/Custom_OpenClash_Rules@main/cfg/Custom_Clash.ini|g' src/handler/settings.cpp
+          # 1. 修复 settings.cpp 中的硬编码默认配置地址
+          sed -i 's|Aethersailor/Custom_OpenClash_Rules|saillill/Custom_OpenClash_Rules|g' src/handler/settings.cpp
 
           # 2. 修复 DEFAULT_REMOTE_CONFIG_FALLBACKS (interfaces.cpp)
           sed -i 's|Aethersailor/Custom_OpenClash_Rules|saillill/Custom_OpenClash_Rules|g' src/handler/interfaces.cpp
 
-          # 3. 修复 pref.example.toml 的默认配置地址
+          # 3. 修复 custom_openclash_rules.cpp 中的仓库匹配逻辑
+          sed -i 's|Aethersailor/Custom_OpenClash_Rules|saillill/Custom_OpenClash_Rules|g' src/config/custom_openclash_rules.cpp
+
+          # 4. 修复 pref.example.toml 中的引用
           sed -i 's|Aethersailor/Custom_OpenClash_Rules|saillill/Custom_OpenClash_Rules|g' base/pref.example.toml
 
-          # 4. 注释掉 snippets/groups.toml 的引入
+          # 5. 注释掉 snippets/groups.toml 的引入（防止注入上游策略组）
           sed -i 's|^import = "snippets/groups.toml"|#import = "snippets/groups.toml"|' base/pref.example.toml
 
-          # 5. 用 fork 的 Custom_Clash.ini 替换内置回退文件
+          # 6. 用 fork 的 Custom_Clash.ini 替换内置回退文件
           curl -fsSL -o base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini \
             "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini"
 
-          # 6. 检查是否有改动，有就提交
+          # 7. 检查是否有改动，有就提交
           if git diff --quiet; then
             echo "no_patch_needed=true" >> $GITHUB_OUTPUT
           else
             echo "no_patch_needed=false" >> $GITHUB_OUTPUT
-            git add src/handler/ base/pref.example.toml base/Custom_OpenClash_Rules/main/cfg/
-            git commit -m "fix(upstream-sync): re-apply fork-specific patches (all Aethersailor → saillill)"
+            git add src/handler/ src/config/ base/pref.example.toml base/Custom_OpenClash_Rules/main/cfg/
+            git commit -m "fix(upstream-sync): re-apply fork-specific patches (Aethersailor → saillill)"
           fi
 
       - name: Push to origin

@@ -52,9 +52,13 @@ bool isSafeSegment(const std::string &segment) {
 }
 
 bool isRepository(const std::vector<std::string> &segments, size_t offset) {
-  return segments.size() > offset + 1 &&
-         equalsIgnoreCase(segments[offset], "Aethersailor") &&
-         equalsIgnoreCase(segments[offset + 1], "Custom_OpenClash_Rules");
+  if (segments.size() <= offset + 1)
+    return false;
+  if (!equalsIgnoreCase(segments[offset + 1], "Custom_OpenClash_Rules"))
+    return false;
+  const std::string &owner = segments[offset];
+  return equalsIgnoreCase(owner, "Aethersailor") ||
+         equalsIgnoreCase(owner, "saillill");
 }
 
 std::string extensionOf(const std::string &path_or_url) {
@@ -138,7 +142,8 @@ Resource matchGitHub(const std::vector<std::string> &segments) {
 
 Resource matchJsDelivr(const std::vector<std::string> &segments) {
   if (segments.size() < 5 || !equalsIgnoreCase(segments[0], "gh") ||
-      !equalsIgnoreCase(segments[1], "Aethersailor"))
+      (!equalsIgnoreCase(segments[1], "Aethersailor") &&
+       !equalsIgnoreCase(segments[1], "saillill")))
     return {};
 
   if (equalsIgnoreCase(segments[2], "Custom_OpenClash_Rules@main"))

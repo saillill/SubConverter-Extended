@@ -35,13 +35,13 @@
 #include "utils/time_compat.h"
 
 const std::vector<std::string> DEFAULT_REMOTE_CONFIG_FALLBACKS = {
-    "https://gcore.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/"
+    "https://gcore.jsdelivr.net/gh/saillill/Custom_OpenClash_Rules@refs/"
     "heads/main/cfg/Custom_Clash.ini",
-    "https://testingcf.jsdelivr.net/gh/Aethersailor/"
+    "https://testingcf.jsdelivr.net/gh/saillill/"
     "Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini",
-    "https://cdn.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/"
+    "https://cdn.jsdelivr.net/gh/saillill/Custom_OpenClash_Rules@refs/"
     "heads/main/cfg/Custom_Clash.ini",
-    "https://raw.githubusercontent.com/Aethersailor/Custom_OpenClash_Rules/"
+    "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules/"
     "main/cfg/Custom_Clash.ini"};
 
 static void appendUniqueConfig(std::vector<std::string> &configs,

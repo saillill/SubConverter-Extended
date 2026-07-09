@@ -554,7 +554,7 @@ void readYAMLConf(YAML::Node &node) {
   // Set hardcoded default if not configured or empty
   if (global.defaultExtConfig.empty()) {
     global.defaultExtConfig =
-        "https://testingcf.jsdelivr.net/gh/saillill/"
+        "https://gcore.jsdelivr.net/gh/saillill/"
         "Custom_OpenClash_Rules@main/cfg/Custom_Clash.ini";
   }
   section["append_proxy_type"] >> global.appendType;
@@ -866,7 +866,7 @@ void readTOMLConf(toml::value &root) {
   // Set hardcoded default if not configured or empty (TOML)
   if (global.defaultExtConfig.empty()) {
     global.defaultExtConfig =
-        "https://testingcf.jsdelivr.net/gh/saillill/"
+        "https://gcore.jsdelivr.net/gh/saillill/"
         "Custom_OpenClash_Rules@main/cfg/Custom_Clash.ini";
   }
 
@@ -1148,7 +1148,7 @@ void readConf() {
   // Set hardcoded default if not configured or empty
   if (global.defaultExtConfig.empty()) {
     global.defaultExtConfig =
-        "https://testingcf.jsdelivr.net/gh/saillill/"
+        "https://gcore.jsdelivr.net/gh/saillill/"
         "Custom_OpenClash_Rules@main/cfg/Custom_Clash.ini";
   }
   ini.get_bool_if_exist("append_proxy_type", global.appendType);

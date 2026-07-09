@@ -222,6 +222,11 @@ RUN set -e && \
       '  *) LIB_ARCH="" ;;' \
       'esac' \
       'if [ -n "$LIB_ARCH" ]; then' \
+      '  # 修复 glibc 库在 Alpine/musl 上的符号缺失问题' \
+      '  apk add --no-cache libssl3 libcrypto3 zstd-libs >/dev/null 2>&1 || true' \
+      '  for lib in libssl.so.3 libcrypto.so.3 libz.so.1 libzstd.so.1; do' \
+      '    [ -f "/usr/lib/$lib" ] && cp "/usr/lib/$lib" "/lib/${LIB_ARCH}/$lib" 2>/dev/null || true' \
+      '  done' \
       '  export LD_LIBRARY_PATH="/lib/${LIB_ARCH}:/usr/lib/${LIB_ARCH}:/lib64:/usr/lib"' \
       'fi' \
       'CONF="${PREF_PATH:-/base/pref.toml}"' \

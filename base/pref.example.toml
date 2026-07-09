@@ -249,11 +249,6 @@ import = "snippets/emoji.toml"
 # strategy = "consistent-hashing"
 # url = "http://www.gstatic.com/generate_204"
 
-[[custom_groups]]
-# Fork: custom groups are loaded from external config (Custom_Clash.ini)
-# The upstream import has been disabled to prevent injecting upstream groups.
-#import = "snippets/groups.toml"
-
 [ruleset]
 # Enable generating rules with rulesets
 enabled = true

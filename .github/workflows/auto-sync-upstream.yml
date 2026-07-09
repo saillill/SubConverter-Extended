@@ -1,8 +1,10 @@
 name: Auto Sync Upstream
 
 on:
+  push:
+    paths:
+      - '.github/workflows/auto-sync-upstream.yml'
   schedule:
-    # 每天北京时间凌晨3点运行
     - cron: '0 19 * * *'
   workflow_dispatch: {}
 
@@ -16,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -33,7 +35,7 @@ jobs:
       - name: Check for updates
         id: check
         run: |
-          BEHIND=$(git rev-list --count HEAD..upstream/master)
+          BEHIND=$(git rev-list --count HEAD..upstream/master || echo "0")
           echo "commits_behind=$BEHIND" >> $GITHUB_OUTPUT
           if [ "$BEHIND" -gt 0 ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
@@ -58,7 +60,7 @@ jobs:
 
       - name: Create conflict issue
         if: steps.check.outputs.has_updates == 'true' && steps.merge.outputs.merge_success != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v6
         with:
           script: |
             const { data: issues } = await github.rest.issues.listForRepo({
@@ -72,15 +74,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: '⚠️ 上游同步冲突 - 需要手动处理',
-                body: `上游 Aethersailor/SubConverter-Extended 有新的更新，但自动合并时发生冲突。
-
-### 手动处理步骤：
-1. 在本地拉取最新代码：\`git pull origin master\`
-2. 合并上游：\`git fetch upstream && git merge upstream/master\`
-3. 解决冲突文件
-4. 推送：\`git push origin master\`
-
-> 🤖 此 Issue 由 Auto Sync Upstream Action 自动创建`,
+                body: `上游 Aethersailor/SubConverter-Extended 有新的更新，但自动合并时发生冲突。\n\n### 手动处理步骤：\n1. 在本地拉取最新代码：\`git pull origin master\`\n2. 合并上游：\`git fetch upstream && git merge upstream/master\`\n3. 解决冲突文件\n4. 推送：\`git push origin master\`\n\n> 🤖 此 Issue 由 Auto Sync Upstream Action 自动创建`,
                 labels: ['upstream-sync-conflict'],
               });
             }

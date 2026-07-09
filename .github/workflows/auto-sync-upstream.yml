@@ -57,20 +57,26 @@ jobs:
         if: steps.merge.outputs.merge_success == 'true'
         id: patch
         run: |
-          # 1. 把硬编码的默认配置地址从 Aethersailor 改为 saillill
+          # 1. 把硬编码的默认配置地址从 Aethersailor 改为 saillill (settings.cpp)
           sed -i 's|https://gcore.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini|https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini|g' src/handler/settings.cpp
 
-          # 2. 用 fork 的 Custom_Clash.ini 替换内置回退文件
+          # 2. 修复 pref.example.toml 的默认配置地址
+          sed -i 's|https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini|https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini|g' base/pref.example.toml
+
+          # 3. 注释掉 snippets/groups.toml 的引入，防止注入上游策略组
+          sed -i 's|^import = "snippets/groups.toml"|#import = "snippets/groups.toml"|' base/pref.example.toml
+
+          # 4. 用 fork 的 Custom_Clash.ini 替换内置回退文件
           curl -fsSL -o base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini \
             "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini"
 
-          # 3. 检查是否有改动，有就提交
+          # 5. 检查是否有改动，有就提交
           if git diff --quiet; then
             echo "no_patch_needed=true" >> $GITHUB_OUTPUT
           else
             echo "no_patch_needed=false" >> $GITHUB_OUTPUT
-            git add src/handler/settings.cpp base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini
-            git commit -m "fix(upstream-sync): re-apply fork-specific patches (config URL + bundled ini)"
+            git add src/handler/settings.cpp base/pref.example.toml base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini
+            git commit -m "fix(upstream-sync): re-apply fork-specific patches (config URL + bundled ini + pref.toml)"
           fi
 
       - name: Push to origin

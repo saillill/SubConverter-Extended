@@ -34,7 +34,7 @@ enable_filter = false
 #}
 #'''
 
-default_external_config = "https://testingcf.jsdelivr.net/gh/Aethersailor/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini"
+default_external_config = "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules@refs/heads/main/cfg/Custom_Clash.ini"
 
 # The file scope limit of the 'rule_base' options in external configs.
 base_path = "base"
@@ -250,7 +250,9 @@ import = "snippets/emoji.toml"
 # url = "http://www.gstatic.com/generate_204"
 
 [[custom_groups]]
-import = "snippets/groups.toml"
+# Fork: custom groups are loaded from external config (Custom_Clash.ini)
+# The upstream import has been disabled to prevent injecting upstream groups.
+#import = "snippets/groups.toml"
 
 [ruleset]
 # Enable generating rules with rulesets

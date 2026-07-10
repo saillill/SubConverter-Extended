@@ -72,16 +72,19 @@ jobs:
           # 5. 注释掉 snippets/groups.toml 的引入（防止注入上游策略组）
           sed -i 's|^import = "snippets/groups.toml"|#import = "snippets/groups.toml"|' base/pref.example.toml
 
-          # 6. 用 fork 的 Custom_Clash.ini 替换内置回退文件
+          # 6. 删除上游的 sync-upstream-parser（fork 不需要，需要 dev 分支）
+          rm -f .github/workflows/sync-upstream-parser.yml
+
+          # 7. 用 fork 的 Custom_Clash.ini 替换内置回退文件
           curl -fsSL -o base/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini \
             "https://raw.githubusercontent.com/saillill/Custom_OpenClash_Rules/main/cfg/Custom_Clash.ini"
 
-          # 7. 检查是否有改动，有就提交
+          # 8. 检查是否有改动，有就提交
           if git diff --quiet; then
             echo "no_patch_needed=true" >> $GITHUB_OUTPUT
           else
             echo "no_patch_needed=false" >> $GITHUB_OUTPUT
-            git add src/handler/ src/config/ base/pref.example.toml base/Custom_OpenClash_Rules/main/cfg/
+            git add src/handler/ src/config/ base/pref.example.toml base/Custom_OpenClash_Rules/main/cfg/ .github/workflows/
             git commit -m "fix(upstream-sync): re-apply fork-specific patches (Aethersailor → saillill)"
           fi
 

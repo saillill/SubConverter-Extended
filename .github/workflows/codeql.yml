@@ -3,9 +3,9 @@ name: "CodeQL"
 on:
   workflow_dispatch:
   push:
-    branches: [ "dev" ]
+    branches: [ "dev", "master" ]
   pull_request:
-    branches: [ "dev" ]
+    branches: [ "dev", "master" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -201,7 +201,8 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        queries: security-and-quality
+        config-file: ./.github/codeql/codeql-config.yml
+        queries: security-extended
         # Disable trap caching to avoid "No such file or directory" error
         trap-caching: false
 

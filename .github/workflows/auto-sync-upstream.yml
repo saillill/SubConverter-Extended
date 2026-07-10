@@ -1,11 +1,6 @@
 name: Auto Sync Upstream
 
 on:
-  push:
-    paths:
-      - '.github/workflows/auto-sync-upstream.yml'
-  schedule:
-    - cron: '0 19 * * *'
   workflow_dispatch: {}
 
 permissions:
